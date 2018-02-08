@@ -1,0 +1,2698 @@
+# RiverWare_Ruleset 7.2
+# Created 10:59 January 26, 2018
+# 
+RULESET
+NAME "RBS Ruleset (from model file)";
+AGENDA_ORDER ASCENDING;
+DESCRIPTION "";
+PRECISION   8;
+NOTES "";
+BEGIN
+
+  POLICY_GROUP   "SetAccountingReturnFlowsToRouted";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetSingleAcccountDivertersReturnFlows";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT user IN "ListSubbasin"( "SingleAccountDiverters" )) DO
+            FOREACH (STRING account IN "AccountNamesByAccountType"( user, "Diversion" )) DO
+            user ~ ( account CONCAT ".returnFlow" ) [] := "Max"( user & "Routed Return Flow" [], 0.00000000 "cfs" );
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetMultiAcccountDivertersReturnFlows";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT user IN "ListSubbasin"( "MultiAccountDiverters" )) DO
+            FOREACH (STRING account IN "AccountNamesByAccountType"( user, "Diversion" )) DO
+            IF_STATEMENT (user ~ ( account CONCAT ".Diversion" ) [@"t - 1"] > 0.00000000 "cfs") THEN
+            user ~ ( account CONCAT ".returnFlow" ) [] := ( user ~ ( account CONCAT ".Diversion" ) [@"t - 1"] / user & "Diversion" [@"t - 1"] ) * user & "Routed Return Flow" [];
+
+      ELSE
+            user ~ ( account CONCAT ".returnFlow" ) [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetPhsyicalValues";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetOnstreamResOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT res IN "ListSubbasin"( "OnstreamRes" )) DO
+            res & "Outflow" [] := "SumAcctSlot"( res, "Outflow", @"t" );
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetWaterUserDiversions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT user IN "ListSubbasin"( "NonDirectReservoirDiverters" )) DO
+            user & "Diversion Requested" [] := "SumAcctSlot"( user, "Diversion", @"t" );
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetAg2PurchasedLeasedReturnFlowOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"24:00:00 June 30, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"24:00:00 June 30, Current Year" TO @"24:00:00 May 31, Next Year") DO
+            $ "Ag2Res UtilityAg2ReturnFlows to NorthCreekNorthFork UtilityAg2ReturnFlow.Supply" [date] := ( "VolumeToFlow"( $ "Ag2Res^UtilityAg2ReturnFlows.Storage" [@"t - 1"], @"t" ) * 0.90000000 ) * $ "Ag2ResData.ReturnFlowPattern" [date];
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetRes2Ag3ReturnFlowsDiversionSupplies";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"24:00:00 May 31, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"24:00:00 May 31, Current Year" TO @"24:00:00 April 30, Next Year") DO
+            $ "Res2 PurchasedAg3ReturnFlows to Res2Outlet Ag3ReturnFlows Div.Supply" [date] := ( "VolumeToFlow"( $ "Res2^PurchasedAg3ReturnFlows.Storage" [@"t - 1"], @"t" ) * 0.90000000 ) * $ "Ag3Data.ReturnFlowPattern" [date];
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetDiversionObjectsDiversions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT user IN "ListSubbasin"( "AllDiversionObjects" )) DO
+            user & "Diversion Request" [] := "SumAcctSlot"( user, "Inflow", @"t" );
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetExternalResOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "ExternalRes.Outflow" [] := "SumAcctSlot"( % "ExternalRes", "Outflow", @"t" );
+
+    END;
+
+    RULE                 "SetAllResDiversions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT "HasRuleFiredSuccessfully"( "SetRes21955Supply" ) == TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT obj IN "ListSubbasin"( "AllRes" )) DO
+            obj & "Diversion" [] := "SumAcctSlot"( obj, "Diversion", @"t" );
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetEastSlopePhysical";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+  END;
+
+  POLICY_GROUP   "SetWholesalerRes2AccountingAndPhysical";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWholesalerRes2Outflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes2.Outflow" [] := "SumAcctSlot"( % "WholesalerRes2", "Outflow", @"t" );
+
+    END;
+
+    RULE                 "SetWholesalerRes2Diversion";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes2.Outflow" [] := "SumAcctSlot"( % "WholesalerRes2", "Diversion", @"t" );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetUtilityDeliveriesFromStorage";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetUtilityTotalSingleUseDeliveryFromStorageSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityDiv UtilitySingleUseStorage to Utility Reach UtilitySingleUse Div.Supply" [] := $ "UtilityDiv^UtilitySingleUseStorage.Inflow" [];
+
+    END;
+
+    RULE                 "SetUtilityTotalReusableDeliveryFromStorageSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityDiv UtilityReusableStorage to Utility Reach UtilityReusable Div.Supply" [] := $ "UtilityDiv^UtilityReusableStorage.Inflow" [];
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "ResendDemandToRes1Res2";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "DemandUnmetRound2";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandUnmetRound2" [] := ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] );
+
+    END;
+
+    RULE                 "Res2DemandResentTMD";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT $ "UtilityData.DemandResentToRes1" [] > 0.00000000 "cfs" AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^UtilityTMD_1956.Storage" [] >= 1.00000000 "acre-ft") THEN
+            $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] := $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] + "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( ( $ "Res2^UtilityTMD_1956.Storage" [@"t - 1"] + $ "Res2^Res2_1955.Gain Loss" [] - "FlowToVolume"( $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [], @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res2DemandResent1955";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT $ "UtilityData.DemandResentToRes1" [] > 0.00000000 "cfs" AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^Res2_1955.Storage" [] >= 1.00000000 "acre-ft") THEN
+            $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] := $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( ( $ "Res2^Res2_1955.Storage" [@"t - 1"] + $ "Res2^Res2_1955.Gain Loss" [] - "FlowToVolume"( $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [], @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res2DemandResentAg3";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT $ "UtilityData.DemandResentToRes1" [] > 0.00000000 "cfs" AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^PurchasedAg3_1892.Storage" [] >= 1.00000000 "acre-ft") THEN
+            $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] := $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( ( $ "Res2^PurchasedAg3_1892.Storage" [@"t - 1"] + $ "Res2^PurchasedAg3_1892.Gain Loss" [] - "FlowToVolume"( $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [], @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res11940Recheck";
+    DESCRIPTION          "";
+    ACTIVE               FALSE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^Res1_1940.Storage" [] < 1.00000000 "acre-ft") THEN
+            $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] := $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res1DemandResent1940";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT $ "UtilityData.DemandResentToRes1" [] > 0.00000000 "cfs" AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^Res1_1940.Storage" [] >= 1.00000000 "acre-ft") THEN
+            $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] := $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( ( $ "Res1^Res1_1940.Storage" [@"t - 1"] + $ "Res1^Res1_1940.Gain Loss" [] - "FlowToVolume"( $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [], @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res1ResentDemandReusable";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT $ "UtilityData.DemandResentToRes1" [] > 0.00000000 "cfs" AND NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^UtilityReusableStorage.Storage" [] >= 1.00000000 "acre-ft") THEN
+            $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] := $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + "Min"( ( $ "UtilityData.DemandDistributedToRes1" [] + $ "UtilityData.DemandDistributedToRes2" [] ) - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] + $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), "Max"( "VolumeToFlow"( ( $ "Res1^UtilityReusableStorage.Storage" [@"t - 1"] + $ "Res1^UtilityReusableStorage.Gain Loss" [] - "FlowToVolume"( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [], @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SendUnmetDemandToRes1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandResentToRes1" [] := $ "UtilityData.DemandUnmetRound1" [];
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetNonWRSolverUtilityStorageSupplyAccounting";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "DemandUnmetRound1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandUnmetRound1" [] := $ "UtilityData.DemandNotMetByRes1Round1" [] + $ "UtilityData.DemandNotMetByRes2Round1" [];
+
+    END;
+
+    RULE                 "CalculateDemandNotMetByRes1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandNotMetByRes1Round1" [] := $ "UtilityData.DemandDistributedToRes1" [] - ( $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] + $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] );
+
+    END;
+
+    RULE                 "Res11940SupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT IsNaN $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [];
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^Res1_1940.Storage" [] <= 0.05000000 "acre-ft") THEN
+            $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetRes11940Supply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^Res1_1940.Storage" [] > 0.05000000 "acre-ft") THEN
+            $ "Res1 Res1_1940 to Ag1Div UtilitySingleUseStorage.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes1" [] - $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( ( $ "Res1^Res1_1940.Storage" [@"t - 1"] - "FlowToVolume"( NaNToZero ( $ "Res1^Res1_1940.Transfers Out" [] ), @"t" ) ) * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "CheckStorageUpdatesForRes1ReusableSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT IsNaN $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [];
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^UtilityReusableStorage.Storage" [] < 0.05000000 "acre-ft") THEN
+            $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetRes1ReusableSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res1^UtilityReusableStorage.Storage" [] >= 0.05000000 "acre-ft") THEN
+            $ "Res1 UtilityReusableStorage to Ag1Div UtilityReusableStorage.Supply" [] := "Min"( $ "UtilityData.DemandDistributedToRes1" [], "Max"( "VolumeToFlow"( $ "Res1^UtilityReusableStorage.Storage" [@"t - 1"] * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "CalculateDemandNotMetByRes2";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandNotMetByRes2Round1" [] := $ "UtilityData.DemandDistributedToRes2" [] - ( $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] + $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] );
+
+    END;
+
+    RULE                 "Res2TMDSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^UtilityTMD_1956.Storage" [] <= 0.05000000 "acre-ft") THEN
+            $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetRes2TMDSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^UtilityTMD_1956.Storage" [] > 0.05000000 "acre-ft") THEN
+            $ "Res2 UtilityTMD_1956 to Res2Outlet UtilityReusableStorage Div.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes2" [] - ( $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] + $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] ) ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "Res2^UtilityTMD_1956.Storage" [@"t - 1"] * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res21955SupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^Res2_1955.Storage" [] <= 0.05000000 "acre-ft") THEN
+            $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetRes21955Supply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^Res2_1955.Storage" [] > 0.05000000 "acre-ft") THEN
+            $ "Res2 Res2_1955 to Res2Outlet UtilitySingleUse Div.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandDistributedToRes2" [] - $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "Res2^Res2_1955.Storage" [@"t - 1"] * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res2PurchasedAg3SupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^PurchasedAg3_1892.Storage" [] <= 0.05000000 "acre-ft") THEN
+            $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetRes2PurchasedAg3Supply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Res2^PurchasedAg3_1892.Storage" [] > 0.05000000 "acre-ft") THEN
+            $ "Res2 PurchasedAg3_1892 to Res2Outlet UtilityReusableStorage Div.Supply" [] := "Min"( "Max"( $ "UtilityData.DemandDistributedToRes2" [], 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "Res2^PurchasedAg3_1892.Storage" [@"t - 1"] * 0.90000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "CalculateAllotmentToRes1AndRes2";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandDistributedToRes2" [] := $ "UtilityData.PercentRelianceOnRes2" [] * ( $ "UtilityData.DemandNotMetByAg2Res" [] / ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ) ) COMMENTED_BY "divide by (1-reach losses) to determine the amount necessary to send down after considering <br>losses";
+
+      $ "UtilityData.DemandDistributedToRes1" [] := ( 1.00000000 - $ "UtilityData.PercentRelianceOnRes2" [] ) * ( $ "UtilityData.DemandNotMetByAg2Res" [] / ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ) );
+
+    END;
+
+    RULE                 "CalculateDemandNotMetByAg2Res";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandNotMetByAg2Res" [] := ( $ "UtilityData.DemandNotMetByWholesaler" [] - ( ( $ "Ag2Res UtilityIfAndWhenExchangedReusable to NorthCreekNorthFork UtilityReusableStorage.Supply" [] + $ "Ag2Res IWSALeasedFromAg2 to NorthCreekNorthFork UtilityReusableStorage.Supply" [] + $ "Ag2Res UtilityAg2Shares to NorthCreekNorthFork UtilityReusableStorage.Supply" [] ) * ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ) ) );
+
+    END;
+
+    RULE                 "Ag2ResUtilitySharesSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^UtilityAg2Shares.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "Ag2Res UtilityAg2Shares to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetAg2ResUtilitySharesSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^UtilityAg2Shares.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "Ag2Res UtilityAg2Shares to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandNotMetByWholesaler" [] - ( NaNToZero ( $ "Ag2Res IWSALeasedFromAg2 to NorthCreekNorthFork UtilityReusableStorage.Supply" [] ) + NaNToZero ( $ "Ag2Res UtilityIfAndWhenExchangedReusable to NorthCreekNorthFork UtilityReusableStorage.Supply" [] ) ) ) / ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "Ag2Res^UtilityAg2Shares.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "IWSASupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^IWSALeasedFromAg2.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "Ag2Res IWSALeasedFromAg2 to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetAg2ResIWSALeasedSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^IWSALeasedFromAg2.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "Ag2Res IWSALeasedFromAg2 to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandNotMetByWholesaler" [] - NaNToZero ( $ "Ag2Res UtilityIfAndWhenExchangedReusable to NorthCreekNorthFork UtilityReusableStorage.Supply" [] ) ) / ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "Ag2Res^IWSALeasedFromAg2.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "UtilityAg2ResIfAndWhenSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^UtilityIfAndWhenExchangedReusable.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "Ag2Res UtilityIfAndWhenExchangedReusable to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetUtilityAg2ResIfAndWhenReusableSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^UtilityIfAndWhenExchangedReusable.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "Ag2Res UtilityIfAndWhenExchangedReusable to NorthCreekNorthFork UtilityReusableStorage.Supply" [] := "Min"( $ "UtilityData.DemandNotMetByWholesaler" [] / ( 1.00000000 + NaNToZero ( $ "TransitLoss.GainLoss Coefficient" [0.00000000, 0.00000000] ) ) COMMENTED_BY "less than 100% of the water will get to the utility diversion site because of the loss coefficient on <br>this reach. in this case, with a 10% loss, the total amount demanded of each subsequent supply <br>needs to be divided by .9", "Max"( "VolumeToFlow"( $ "Ag2Res^UtilityIfAndWhenExchangedReusable.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Ag2ResSupplyToAg2Check";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^Ag2Shares.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "Ag2Res Ag2Shares to Ag2 Ag2 Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetAg2ResSupplyToAg2";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag2Res^Ag2Shares.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "Ag2Res Ag2Shares to Ag2 Ag2 Div.Supply" [] := "MinItem"( { $ "Ag2^Ag2.Initial Request" [] , $ "Ag2Res.Diversion Capacity" [] , "Max"( "VolumeToFlow"( $ "Ag2Res^Ag2Shares.Storage" [@"t - 1"] * 0.75000000, @"t" ), 0.00000000 "cfs" ) } );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "CalculateDemandNotMetByWholesaler";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandNotMetByWholesaler" [] := "Max"( $ "UtilityData.DemandNotMetByFlowRights" [] - $ "WholesalerToUtilityDiv UtilitySharesSingleUse to Utility Wholesaler UtilityWholesaler Div.Supply" [], 0.00000000 "cfs" );
+
+    END;
+
+    RULE                 "SetUtilityTotalWholesalerSupplyToUtilityUser";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerToUtilityDiv UtilitySharesSingleUse to Utility Wholesaler UtilityWholesaler Div.Supply" [] := "Max"( $ "WholesalerToUtilityDiv^UtilitySharesSingleUse.Inflow" [], 0.00000000 "cfs" );
+
+    END;
+
+    RULE                 "UtilityWholesalerSharesSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^UtilitySharesSingleUse.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerToUtilityDiv UtilitySharesSingleUse.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetUtilityWholesalerSharesSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^UtilitySharesSingleUse.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerToUtilityDiv UtilitySharesSingleUse.Supply" [] := "Min"( "Max"( ( $ "UtilityData.DemandNotMetByFlowRights" [] - $ "WholesalerRes2 Pooled to WholesalerToUtilityDiv UtilitySharesSingleUse.Supply" [] ), 0.00000000 "cfs" ), "Max"( "VolumeToFlow"( $ "WholesalerRes2^UtilitySharesSingleUse.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "UtilityWholesalerPooledSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^Pooled.Storage" [] <= 0.01000000 "acre-ft") THEN
+            $ "WholesalerRes2 Pooled to WholesalerToUtilityDiv UtilitySharesSingleUse.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetUtilityWholesalerPooledSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^Pooled.Storage" [] > 0.01000000 "acre-ft") THEN
+            $ "WholesalerRes2 Pooled to WholesalerToUtilityDiv UtilitySharesSingleUse.Supply" [] := "Min"( $ "UtilityData.DemandNotMetByFlowRights" [], "Max"( "VolumeToFlow"( $ "WholesalerRes2^Pooled.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetAccountingSupplyToAg4User";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerToAg4Div WholesalerToAg4 to Ag4 Wholesaler Ag4FromWholesaler Div.Supply" [] := $ "WholesalerRes2 Ag4Shares to WholesalerToUtilityDiv Ag4Shares.Supply" [];
+
+    END;
+
+    RULE                 "Ag4WholesalerSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^Ag4Shares.Storage" [] <= 0.10000000 "acre-ft") THEN
+            $ "WholesalerRes2 Ag4Shares to WholesalerToUtilityDiv Ag4Shares.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Ag4WholesalerSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^Ag4Shares.Storage" [] > 0.10000000 "acre-ft") THEN
+            $ "WholesalerRes2 Ag4Shares to WholesalerToUtilityDiv Ag4Shares.Supply" [] := "Min"( $ "Ag4:Reach^Ag4_1920.Shortage" [], "Max"( "VolumeToFlow"( $ "WholesalerRes2^Ag4Shares.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExternalWholesalerSupplyCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^ExternalSharesSingleUse.Storage" [] <= 0.10000000 "acre-ft") THEN
+            $ "WholesalerRes2 ExternalSharesSingleUse to ExternalWholesalerUsers ExternalWholesalerUsers Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetExternalWholesalerUserSupply";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^ExternalSharesSingleUse.Storage" [] > 0.10000000 "acre-ft") THEN
+            $ "WholesalerRes2 ExternalSharesSingleUse to ExternalWholesalerUsers ExternalWholesalerUsers Div.Supply" [] := "Min"( "VolumeToFlow"( $ "ExternalWholesalerUsersData.AnnualDemandProportions" [] * $ "ExternalWholesalerUsersData.OwnedWSShares" [] * $ "WholesalerData.WholesalerAnnualQuota" [], @"t" ), "Max"( "VolumeToFlow"( $ "WholesalerRes2^ExternalSharesSingleUse.Storage" [@"t - 1"] * 1.00000000, @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "CalculateDemandNotMetByFlowRights";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.DemandNotMetByFlowRights" [] := "VolumeToFlow"( $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [], @"t" ) - ( $ "Utility:Reach^Utility_1895.Diversion" [] + $ "Utility:Reach^PurchasedIndustrialRights.Diversion" [] + $ "Utility:Reach^Utility_1908.Diversion" [] + $ "Utility:Reach^Utility_1936.Diversion" [] );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetWholesalerRes2Accounting";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "TransferUnusedUtilitySharesToExternal";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "WholesalerRes2^UtilitySharesSingleUse.Storage" [@"t - 1"] + $ "WholesalerRes2^UtilitySharesSingleUse.Gain Loss" [@"t - 1"] - "FlowToVolume"( $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerRes2 Pooled Tran.Supply" [], @"t" ) >= 0.10000000 "acre-ft") THEN
+            $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerRes2 ExternalSharesSingleUse Tran.Supply" [] := "VolumeToFlow"( $ "WholesalerRes2^UtilitySharesSingleUse.Storage" [@"t - 1"] + $ "WholesalerRes2^UtilitySharesSingleUse.Gain Loss" [@"t - 1"] - "FlowToVolume"( $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerRes2 Pooled Tran.Supply" [], @"t" ) - 0.10000000 "acre-ft", @"t" );
+
+      ELSE
+            $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerRes2 ExternalSharesSingleUse Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "TransferUtilitySharesToPooled";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes2 UtilitySharesSingleUse to WholesalerRes2 Pooled Tran.Supply" [] := "Min"( "Max"( "VolumeToFlow"( $ "WholesalerRes2^UtilitySharesSingleUse.Storage" [@"t - 1"] + $ "WholesalerRes2^UtilitySharesSingleUse.Gain Loss" [@"t - 1"], @"t" ), 0.00000000 "cfs" ), "VolumeToFlow"( 0.20000000 * ( $ "UtilityData.TotalWSShares" [@"t - 1"] * $ "WholesalerData.WholesalerAnnualQuota" [@"t - 1"] ), @"t" ) );
+
+    END;
+
+    RULE                 "TransferUtilityPooledToExternal";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes2 Pooled to WholesalerRes2 ExternalSharesSingleUse Tran.Supply" [] := "Max"( "VolumeToFlow"( $ "WholesalerRes2^Pooled.Storage" [@"t - 1"] + $ "WholesalerRes2^Pooled.Gain Loss" [@"t - 1"], @"t" ), 0.00000000 "cfs" );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "UtilityExchanges";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "XresToRes1PhysicalExchangeXResRelease";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "ExternalRes BookExchangeRes1SingleUse to ExternalResOutlet AllocatableFlow.Supply" [] := $ "Res1 FromXResPhysical to Res1 UtilityReusableStorage Tran.Supply" [];
+
+    END;
+
+    RULE                 "XResToRes1PhysicalExchangeTransferToRes1Reusable";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res1 FromXResPhysical to Res1 UtilityReusableStorage Tran.Supply" [] := $ "Res1 AllocatableFlow to Res1 FromXResPhysical Tran.Supply" [];
+
+    END;
+
+    RULE                 "XResToRes1PhysicalExchangeRes1TransferCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag1^Ag1_1898.Shortage" [] != 0.00000000 "cfs" OR $ "ExternalRes^BookExchangeRes1SingleUse.Storage" [@"t - 1"] <= 1.00000000 "acre-ft") THEN
+            $ "Res1 AllocatableFlow to Res1 FromXResPhysical Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "XResToRes1PhysicalExchangeRes1Transfer";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag1^Ag1_1898.Shortage" [] == 0.00000000 "cfs" AND $ "ExternalRes^BookExchangeRes1SingleUse.Storage" [@"t - 1"] > 1.00000000 "acre-ft") THEN
+            $ "Res1 AllocatableFlow to Res1 FromXResPhysical Tran.Supply" [] := "MinItem"( { $ "Res1^AllocatableFlow.Temp Available For Appropriation" [] , $ "Res1.Conservation Pool Initial Empty Space" [] - ( $ "Res1 AllocatableFlow to Res1 Res1_1940 Tran.Supply" [] + $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] + $ "Res1 AllocatableFlow to Res1 FromGravelPit Tran.Supply" [] ) , "VolumeToFlow"( $ "ExternalRes^BookExchangeRes1SingleUse.Storage" [@"t - 1"] * 0.90000000, @"t" ) } );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res1TransferForXResBookExchangeToReusable";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res1 FromXResBook to Res1 UtilityReusableStorage Tran.Supply" [] := $ "ExternalRes ReusableExchangedWater to ExternalRes BookExchangeRes1SingleUse Tran.Supply" [];
+
+    END;
+
+    RULE                 "Res1TransferFor1940ToXResBookExchange";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res1 Res1_1940 to Res1 FromXResBook Tran.Supply" [] := $ "ExternalRes ReusableExchangedWater to ExternalRes BookExchangeRes1SingleUse Tran.Supply" [];
+
+    END;
+
+    RULE                 "XResTransferForRes1BookExchange";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityExchanges.XResCapacity" [] > 0.00000000 "acre-ft") THEN
+            $ "ExternalRes ReusableExchangedWater to ExternalRes BookExchangeRes1SingleUse Tran.Supply" [] := "VolumeToFlow"( "Min"( $ "ExternalRes^ReusableExchangedWater.Storage" [@"t - 1"], $ "Res1^Res1_1940.Storage" [@"t - 1"] - "FlowToVolume"( $ "Res1^Res1_1940.Outflow" [], @"t" ) ), @"t" );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "GravelPitTransfer";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "GravelPit UtilityReusable to GravelPit ForExchange Tran.Supply" [] := $ "GravelPitDiv UtilityReusable to GravelPitDivObj UtilityReusable Div.Supply" [];
+
+    END;
+
+    RULE                 "GravelPitDiversionFromReachCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityExchanges.GravelPitOnOff" [] != 1.00000000) THEN
+            $ "GravelPitDiv UtilityReusable to GravelPitDivObj UtilityReusable Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "GravelPitDiversionFromReach";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityExchanges.GravelPitOnOff" [] == 1.00000000) THEN
+            $ "GravelPitDiv UtilityReusable to GravelPitDivObj UtilityReusable Div.Supply" [] := "Min"( $ "GravelPitDiv^UtilityReusable.Inflow" [] - ( $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] + $ "Ag2Res AllocatableFlow to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] + $ "ExternalResDiv AllocatableFlow to ExternalResDivObj ReusableExchangedWater Div.Supply" [] ), "Max"( "VolumeToFlow"( "GetResMaxVolume"( % "GravelPit" ) - $ "GravelPit.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "GravelPitDiversionToReach";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+    INACTIVE      IF_STATEMENT ($ "GravelPit.Storage" [@"t - 1"] > 0.10000000 "acre-ft" AND $ "UtilityData.PercentageOfIndustrialRights" [] != 0.00000000) THEN
+            $ "GravelPit ForExchange to GravelPitOutlet AllocatableFlow Div.Supply" [] := "Max"( $ "UtilityDiv AllocatableFlow to Utility Reach PurchasedIndustrialRights Div.Supply" [] - $ "Utility:Reach^PurchasedIndustrialRights.Maximum Request" [] * ( 1.00000000 - $ "Industrial.Periodic Fraction" [] ), 0.00000000 "cfs" );
+
+      ELSE
+            $ "GravelPit ForExchange to GravelPitOutlet AllocatableFlow Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+      $ "GravelPit ForExchange to GravelPitOutlet AllocatableFlow Div.Supply" [] := $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [] + $ "UtilityExchanges.TrackGPExchangeToRes1" [] + $ "UtilityExchanges.TrackGPExchangeToAg2Res" [];
+
+    END;
+
+    RULE                 "Ag2ResFromGravelPitToIfAndWhen";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Ag2Res FromGravelPit to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] := $ "UtilityExchanges.TrackGPExchangeToAg2Res" [];
+
+    END;
+
+    RULE                 "RecordGravelPitToAg2Res";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityExchanges.TrackGPExchangeToAg2Res" [] := $ "Ag2Res AllocatableFlow to Ag2Res FromGravelPit Tran.Supply" [];
+
+    END;
+
+    RULE                 "GravelPitExchangeToAg2ResCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Industrial^Industrial_1902.Shortage" [] != 0.00000000 "cfs" OR ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [] + $ "UtilityExchanges.TrackGPExchangeToRes1" [], @"t" ) ) <= 0.50000000 "acre-ft" OR $ "UtilityExchanges.Ag2ResIfWhen" [] == 0.00000000) THEN
+            $ "Ag2Res AllocatableFlow to Ag2Res FromGravelPit Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "GravelPitExchangeToAg2Res";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Industrial^Industrial_1902.Shortage" [] == 0.00000000 "cfs" AND ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [] + $ "UtilityExchanges.TrackGPExchangeToRes1" [], @"t" ) ) > 0.50000000 "acre-ft" AND $ "UtilityExchanges.Ag2ResIfWhen" [] != 0.00000000) THEN
+            $ "Ag2Res AllocatableFlow to Ag2Res FromGravelPit Tran.Supply" [] := "MinItem"( { $ "Ag2Res.Conservation Pool Initial Empty Space" [] - ( $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] + $ "Ag2Res AllocatableFlow to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] ) , "VolumeToFlow"( ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [] + $ "UtilityExchanges.TrackGPExchangeToRes1" [], @"t" ) ) * 0.50000000, @"t" ) , $ "Ag2Res^AllocatableFlow.Temp Available For Appropriation" [] } );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Res1FromGravelPitToReusable";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res1 FromGravelPit to Res1 UtilityReusableStorage Tran.Supply" [] := $ "UtilityExchanges.TrackGPExchangeToRes1" [];
+
+    END;
+
+    RULE                 "RecordGravelPitToRes1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityExchanges.TrackGPExchangeToRes1" [] := $ "Res1 AllocatableFlow to Res1 FromGravelPit Tran.Supply" [];
+
+    END;
+
+    RULE                 "GravelPitExchangeToRes1Check";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Industrial^Industrial_1902.Shortage" [] != 0.00000000 "cfs" OR $ "Ag1^Ag1_1898.Shortage" [] != 0.00000000 "cfs" OR ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [], @"t" ) ) <= 0.50000000 "acre-ft" OR $ "UtilityExchanges.RFtoRes1" [] == 0.00000000) THEN
+            $ "Res1 AllocatableFlow to Res1 FromGravelPit Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "GravelPitExchangeToRes1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Industrial^Industrial_1902.Shortage" [] == 0.00000000 "cfs" AND $ "Ag1^Ag1_1898.Shortage" [] == 0.00000000 "cfs" AND ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [], @"t" ) ) > 0.50000000 "acre-ft" AND $ "UtilityExchanges.RFtoRes1" [] != 0.00000000) THEN
+            $ "Res1 AllocatableFlow to Res1 FromGravelPit Tran.Supply" [] := "MinItem"( { $ "Res1.Conservation Pool Initial Empty Space" [] - ( $ "Res1 AllocatableFlow to Res1 Res1_1940 Tran.Supply" [] + $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] ) , "VolumeToFlow"( ( $ "GravelPit.Storage" [@"t - 1"] - "FlowToVolume"( $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [], @"t" ) ) * 0.75000000, @"t" ) , $ "Res1^AllocatableFlow.Temp Available For Appropriation" [] } );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoXResCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityExchanges.XResCapacity" [] <= 0.00000000 "acre-ft") THEN
+            $ "ExternalResDiv AllocatableFlow to ExternalResDivObj ReusableExchangedWater Div.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoXRes";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityExchanges.XResCapacity" [] > 0.00000000 "acre-ft") THEN
+            $ "ExternalResDiv AllocatableFlow to ExternalResDivObj ReusableExchangedWater Div.Supply" [] := "MinItem"( { "MaxItem"( { $ "ExternalResDiv^AllocatableFlow.Temp Available For Appropriation" [] , $ "ExternalResDiv^AllocatableFlow.Inflow" [] , 0.00000000 "cfs" } ) , "Max"( "VolumeToFlow"( $ "UtilityExchanges.XResCapacity" [] - $ "ExternalRes.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) , $ "GravelPitDiv^UtilityReusable.Inflow" [] - ( $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] + $ "Ag2Res AllocatableFlow to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] ) } ) * $ "UtilityExchanges.RFtoRes1" [];
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoAg2ResIfWhenCheck";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT (@"t" != @"24:00:00 November 30, Current Year" AND @"t" != @"24:00:00 December 31, Current Year" AND @"t" != @"24:00:00 January 31, Current Year" AND @"t" != @"0:00:00 March 1, Current Year") THEN
+            $ "Ag2Res AllocatableFlow to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoAg2ResIfWhen";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT (@"t" == @"24:00:00 November 30, Current Year" OR @"t" == @"24:00:00 December 31, Current Year" OR @"t" == @"24:00:00 January 31, Current Year" OR @"t" == @"0:00:00 March 1, Current Year") THEN
+            $ "Ag2Res AllocatableFlow to Ag2Res UtilityIfAndWhenExchangedReusable Tran.Supply" [] := "MinItem"( { $ "Ag2Res^AllocatableFlow.Temp Available For Appropriation" [] , $ "Ag2Res.Conservation Pool Initial Empty Space" [] - $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] , ( $ "GravelPitDiv^UtilityReusable.Inflow" [] - $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] ) } ) * $ "UtilityExchanges.Ag2ResIfWhen" [];
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoRes1Check";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag1^Ag1_1898.Shortage" [] != 0.00000000 "cfs") THEN
+            $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] := 0.00000000 "cfs";
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ExchangeRFtoRes1";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "Ag1^Ag1_1898.Shortage" [] == 0.00000000 "cfs") THEN
+            $ "Res1 AllocatableFlow to Res1 UtilityReusableStorage Tran.Supply" [] := "MinItem"( { $ "Res1^AllocatableFlow.Temp Available For Appropriation" [] , $ "Res1.Conservation Pool Initial Empty Space" [] - $ "Res1 AllocatableFlow to Res1 Res1_1940 Tran.Supply" [] , $ "GravelPitDiv^UtilityReusable.Inflow" [] } ) * $ "UtilityExchanges.RFtoRes1" [];
+
+      END_IF_STATEMENT;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "RulesForPurchasedIndustrialIndustrial";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "RecordPurchasedIndustrialRFMetByGravelPit";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityExchanges.TrackPurchasedIndustrialRFfromGP" [] := "Max"( $ "UtilityDiv AllocatableFlow to Utility Reach PurchasedIndustrialRights Div.Supply" [] - $ "Utility:Reach^PurchasedIndustrialRights.Maximum Request" [] * ( 1.00000000 - $ "Industrial.Periodic Fraction" [] ), 0.00000000 "cfs" );
+
+    END;
+
+    RULE                 "AdjustPurchasedIndustrialDiversionToAccountForReturnFlows";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "GravelPit.Storage" [@"t - 1"] > 0.50000000 "acre-ft" AND $ "UtilityData.PercentageOfIndustrialRights" [] != 0.00000000) THEN
+            $ "UtilityDiv AllocatableFlow to Utility Reach PurchasedIndustrialRights Div.Supply" [] := $ "Utility:Reach^PurchasedIndustrialRights.Diversion" [] * ( 1.00000000 - $ "Industrial.Periodic Fraction" [] ) + "Min"( $ "Utility:Reach^PurchasedIndustrialRights.Diversion" [] * $ "Industrial.Periodic Fraction" [], "VolumeToFlow"( $ "GravelPit.Storage" [@"t - 1"] * 0.75000000, @"t" ) );
+
+      ELSE
+            $ "UtilityDiv AllocatableFlow to Utility Reach PurchasedIndustrialRights Div.Supply" [] := $ "Utility:Reach^PurchasedIndustrialRights.Diversion" [] * ( 1.00000000 - $ "Industrial.Periodic Fraction" [] );
+
+      END_IF_STATEMENT;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetEastSlopeSupplies";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetAg2PurchasedAndLeasedTransfersToReturnFlows";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Ag2Res UtilityAg2Shares to Ag2Res UtilityAg2ReturnFlows Tran.Supply" [] := $ "Ag2Res Ag2Res_1905 to Ag2Res UtilityAg2Shares Tran.Supply" [] * 0.30000000;
+
+      $ "Ag2Res IWSALeasedFromAg2 to Ag2Res UtilityAg2ReturnFlows Tran.Supply" [] := $ "Ag2Res Ag2Shares to Ag2Res IWSALeasedFromAg2 Tran.Supply" [] * 0.30000000;
+
+    END;
+
+    RULE                 "Ag2ResTransferFromAg2SharesToUtilityLeased";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT (@"t" == @"0:00:00 January 1, Current Year" OR @"t" == @"0:00:00 February 1, Current Year") THEN
+            $ "Ag2Res Ag2Shares to Ag2Res IWSALeasedFromAg2 Tran.Supply" [] := $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] * ( $ "UtilityData.Ag2IWSAShares" [] / $ "Ag2ResData.TotalAg2ResShares" [] ) * $ "UtilityData.Ag2IWSAExercise" [@"0:00:00 March 1, Previous Year"];
+
+      ELSE
+            $ "Ag2Res Ag2Shares to Ag2Res IWSALeasedFromAg2 Tran.Supply" [] := $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] * ( $ "UtilityData.Ag2IWSAShares" [] / $ "Ag2ResData.TotalAg2ResShares" [] ) * $ "UtilityData.Ag2IWSAExercise" [@"0:00:00 March 1, Current Year"];
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "Ag2ResTransferForAg2";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Ag2Res Ag2Res_1905 to Ag2Res Ag2Shares Tran.Supply" [] := $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] * ( $ "Ag2Data.Ag2ResShares" [] / $ "Ag2ResData.TotalAg2ResShares" [] );
+
+    END;
+
+    RULE                 "Ag2ResTransferForUtility";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Ag2Res Ag2Res_1905 to Ag2Res UtilityAg2Shares Tran.Supply" [] := $ "Ag2Res AllocatableFlow to Ag2Res Ag2Res_1905 Tran.Supply" [] * ( $ "UtilityData.Ag2PurchasedShares" [] / $ "Ag2ResData.TotalAg2ResShares" [] );
+
+    END;
+
+    RULE                 "TransferStoredAg3RightsToReturnFlowAccount";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res2 PurchasedAg3_1892 to Res2 PurchasedAg3ReturnFlows Tran.Supply" [] := $ "Res2 Res2TransferAccount to Res2 PurchasedAg3_1892 Tran.Supply" [] * 0.30000000;
+
+    END;
+
+    RULE                 "SetRes2AccountTransfers";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Res2 Res2TransferAccount to Res2 Res2_1955 Tran.Supply" [] := $ "DiversionsToRes2^Res2_1955.Diversion" [];
+
+      $ "Res2 Res2TransferAccount to Res2 PurchasedAg3_1892 Tran.Supply" [] := $ "DiversionsToRes2^PurchasedAg3Rights.Diversion" [];
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "EastSlopeWaterRightsAllocation";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "InstreamBAllocation";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (LIST pair IN "SolveWaterRights"( "EastSlope", "Allocatable", "AccountPriorityDate"( % "InstreamB", "InstreamB_1930" ) )) DO
+            ( GET @INDEX 0.00000000 FROM pair ) [] := GET @INDEX 1.00000000 FROM pair;
+
+            PRINT GET @INDEX 0.00000000 FROM pair;
+
+            PRINT GET @INDEX 1.00000000 FROM pair;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "EastSlopeInitialAllocation";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (LIST pair IN "SolveWaterRights"( "EastSlope", "Allocatable", @"24:00:00 January 1, 1880" )) DO
+            ( GET @INDEX 0.00000000 FROM pair ) [] := GET @INDEX 1.00000000 FROM pair;
+
+            PRINT GET @INDEX 0.00000000 FROM pair;
+
+            PRINT GET @INDEX 1.00000000 FROM pair;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "InitializeEastSlope";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "Ag2DivReq";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      % "Ag2" ~ "Ag2.Initial Request" [] := $ "Ag2Data.DivReqAsFlow" [];
+
+    END;
+
+    RULE                 "SetRes2_1955WaterUserInitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "DiversionsToRes2^Res2_1955.Initial Request" [] := "Min"( "Max"( "VolumeToFlow"( $ "Res2^Res2_1955.Maximum Accrual" [] - $ "Res2^Res2_1955.Accrual" [@"t - 1"], @"t" ), 0.00000000 "cfs" ), "Max"( $ "Res2.Conservation Pool Initial Empty Space" [] - $ "Res2^UtilityTMD_1956.Inflow" [] - $ "DiversionsToRes2^PurchasedAg3Rights.Diversion" [], 0.00000000 "cfs" ) );
+
+    END;
+
+    RULE                 "SetRes2PurchasedAg3RightsWaterUserInitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "DiversionsToRes2^PurchasedAg3Rights.Initial Request" [] := "Min"( $ "UtilityData.PercentageOfAg3Rights" [] * $ "Ag3Data.OriginalWaterRight" [], "Max"( $ "Res2.Conservation Pool Initial Empty Space" [] - $ "Res2^UtilityTMD_1956.Inflow" [], 0.00000000 "cfs" ) );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetWestSlopePhysical";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWestSlopeResOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WestSlopeRes.Outflow" [] := $ "WestSlopeRes UtilityTMD_1956 to UtilityTMDOutflow UtilityTMD_1956.Supply" [];
+
+    END;
+
+    RULE                 "SetUtilityTMD1Diversion";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityTMD1.Diversion Request" [] := $ "UtilityTMD1^UtilityTMD_1956.Inflow" [];
+
+    END;
+
+    RULE                 "SetWholesalerRes1DiversionAndWestToEastDiversionRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes1.Diversion" [] := "SumAcctSlot"( % "WholesalerRes1", "Diversion", @"t" );
+
+      $ "Wholesaler1TMD.Diversion Requested" [] := "SumAcctSlot"( % "WholesalerRes1", "Diversion", @"t" );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetWestSlopeSupplies";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWestSlopeMunicipalAccountDiversions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WestSlopeMunicipalRes WestSlopeMunicipalRes_1919 to WestSlopeMunicipal WestSlopeMunicipal Div.Supply" [] := "Min"( $ "WestSlopeMunicipalData.WaterRight" [], $ "WestSlopeMunicipalRes.Available for Diversion" [] * 0.90000000 );
+
+    END;
+
+    RULE                 "SetWholesaler1AccountDiversionsSupplies";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes1 Ag4Shares to Wholesaler1TMD Ag4Shares Div.Supply" [] := $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 Ag4Shares Tran.Supply" [];
+
+      $ "WholesalerRes1 ExternalSharesSingleUse to Wholesaler1TMD ExternalSharesSingleUse Div.Supply" [] := $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 ExternalSharesSingleUse Tran.Supply" [];
+
+      $ "WholesalerRes1 UtilitySharesSingleUse to Wholesaler1TMD UtilitySharesSingleUse Div.Supply" [] := $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 UtilitySharesSingleUse Tran.Supply" [];
+
+    END;
+
+    RULE                 "SetWholesaler1ResTransfers";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 Ag4Shares Tran.Supply" [] := "MinItem"( { "VolumeToFlow"( $ "Ag4Data.OwnedWSShares" [] * $ "WholesalerData.WholesalerAnnualQuota" [], @"t" ) , "Max"( "VolumeToFlow"( $ "WholesalerRes2Data.Ag4StorageAllotment" [] - $ "WholesalerRes2^Ag4Shares.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) , "VolumeToFlow"( ( $ "Ag4Data.OwnedWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] ) * ( $ "WholesalerRes1.Storage" [@"t - 1"] * 0.90000000 ), @"t" ) } );
+
+      $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 ExternalSharesSingleUse Tran.Supply" [] := "MinItem"( { "VolumeToFlow"( $ "ExternalWholesalerUsersData.OwnedWSShares" [] * $ "WholesalerData.WholesalerAnnualQuota" [], @"t" ) , "Max"( "VolumeToFlow"( $ "WholesalerRes2Data.ExternalUsersStorageAllotment" [] - $ "WholesalerRes2^ExternalSharesSingleUse.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) , "VolumeToFlow"( ( $ "ExternalWholesalerUsersData.OwnedWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] ) * ( $ "WholesalerRes1.Storage" [@"t - 1"] * 0.90000000 ), @"t" ) } );
+
+      $ "WholesalerRes1 Wholesaler1_1936 to WholesalerRes1 UtilitySharesSingleUse Tran.Supply" [] := "MinItem"( { "VolumeToFlow"( $ "UtilityData.TotalWSShares" [] * $ "WholesalerData.WholesalerAnnualQuota" [], @"t" ) , "Max"( "VolumeToFlow"( $ "WholesalerRes2Data.UtilityStorageAllotment" [] - $ "WholesalerRes2^UtilitySharesSingleUse.Storage" [@"t - 1"], @"t" ), 0.00000000 "cfs" ) , "VolumeToFlow"( ( $ "UtilityData.TotalWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] ) * ( $ "WholesalerRes1.Storage" [@"t - 1"] * 0.90000000 ), @"t" ) } );
+
+    END;
+
+    RULE                 "SetWestSlopeResAccountingOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityTMDData.WestSlopeResCapacity" [] > 0.00000000 AND $ "WestSlopeRes.Storage" [@"t - 1"] > 0.10000000 "acre-ft") THEN
+            $ "WestSlopeRes UtilityTMD_1956 to UtilityTMDOutflow UtilityTMD_1956.Supply" [] := "MinItem"( { "VolumeToFlow"( "GetResMaxVolume"( % "Res2" ) - $ "Res2.Storage" [@"t - 1"], @"t" ) , "Max"( "VolumeToFlow"( $ "WestSlopeRes.Storage" [@"t - 1"] * 0.90000000, @"t" ), 0.00000000 "cfs" ) , $ "UtilityTMDOutflow.Diversion Capacity" [] } );
+
+      ELSE
+            $ "WestSlopeRes UtilityTMD_1956 to UtilityTMDOutflow UtilityTMD_1956.Supply" [] := "Min"( $ "WestSlopeRes^UtilityTMD_1956.Inflow" [], "VolumeToFlow"( "GetResMaxVolume"( % "Res2" ) - $ "Res2.Storage" [@"t - 1"], @"t" ) );
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "ZeroWestSlopeResOutflow";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT "HasRuleFiredSuccessfully"( "ThisRule" ) == FALSE;
+    NOTES                "";
+    BEGIN
+
+      $ "WestSlopeRes UtilityTMD_1956 to UtilityTMDOutflow UtilityTMD_1956.Supply" [] := 0.00000000 "cfs";
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "WestSlopeWaterRightsAllocation";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "LowerBasinInstreamAllocation";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (LIST pair IN "SolveWaterRights"( "WestSlope", "WestAllocatable", "AccountPriorityDate"( % "LowerBasin", "LowerBasin_1922" ) )) DO
+            ( GET @INDEX 0.00000000 FROM pair ) [] := GET @INDEX 1.00000000 FROM pair;
+
+            PRINT GET @INDEX 0.00000000 FROM pair;
+
+            PRINT GET @INDEX 1.00000000 FROM pair;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "WestSlopeInitialAllocation";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (LIST pair IN "SolveWaterRights"( "WestSlope", "WestAllocatable", @"24:00:00 January 1, 1881" )) DO
+            ( GET @INDEX 0.00000000 FROM pair ) [] := GET @INDEX 1.00000000 FROM pair;
+
+            PRINT GET @INDEX 0.00000000 FROM pair;
+
+            PRINT GET @INDEX 1.00000000 FROM pair;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "InitializeUtility";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetUtilityReachReusableDiversion";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityDiv UtilityReusableStorage to Utility Reach UtilityReusable Div.Supply" [] := 0.00000000 "cfs";
+
+    END;
+
+    RULE                 "SetUtilityReachSingleUseDiversion";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityDiv UtilitySingleUseStorage to Utility Reach UtilitySingleUse Div.Supply" [] := 0.00000000 "cfs";
+
+    END;
+
+    RULE                 "LimitIWSAto3in10years";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 March 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT (@"t" >= @"Start Timestep" AND @"t" < @"24:00:00 September 30, 2024") THEN
+            IF_STATEMENT ("SumSlotSkipNaN"( $ "UtilityData.Ag2IWSAExercise", @"Start Timestep", @"t" ) <= 36.00000000) THEN
+            FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date] := $ "UtilityData.Ag2IWSAExercise" [date];
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date1 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date1] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT (@"t" >= @"24:00:00 September 30, 2024" AND @"t" < @"24:00:00 September 30, 2034") THEN
+            IF_STATEMENT ("SumSlotSkipNaN"( $ "UtilityData.Ag2IWSAExercise", @"24:00:00 September 30, 2024", @"t" ) <= 36.00000000) THEN
+            FOREACH (DATETIME date2 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date2] := $ "UtilityData.Ag2IWSAExercise" [date2];
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date3 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date3] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT (@"t" >= @"24:00:00 September 30, 2034") THEN
+            IF_STATEMENT ("SumSlotSkipNaN"( $ "UtilityData.Ag2IWSAExercise", @"24:00:00 September 30, 2034", @"t" ) <= 36.00000000) THEN
+            FOREACH (DATETIME date4 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date4] := $ "UtilityData.Ag2IWSAExercise" [date4];
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date5 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date5] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "TriggerIWSA";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 March 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+    DESCRIPTION          "at the end of every february, if utility storage is below the threshold that triggers level 3 <br>restrictions and the upcoming hydrology is at least 90% of longterm average, exercise the IWSA. <br>referring to the value in that table allows for the decision levers to impact the storage-based <br>exercise threshold. the next most senior rule will make sure it doesn't get triggered more than 3 <br>times per 10 years<br><br>the storage trigger table referenced will change depending on a decision variable that can be (1) lax, (2) neutral, (3) conservative";
+      IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 1.00000000) THEN
+            IF_STATEMENT ($ "UtilityData.StorageToLongTermAnnualDemand" [] <= $ "UtilityData.RestrictionTriggersStorageLax" [1.00000000, 0.00000000] AND $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [] >= 0.90000000) THEN
+            FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date] := 1.00000000;
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date1 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date1] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 2.00000000) THEN
+            IF_STATEMENT ($ "UtilityData.StorageToLongTermAnnualDemand" [] <= $ "UtilityData.RestrictionTriggersStorageNeutral" [1.00000000, 0.00000000] AND $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [] >= 0.90000000) THEN
+            FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date] := 1.00000000;
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date1 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date1] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 3.00000000) THEN
+            IF_STATEMENT ($ "UtilityData.StorageToLongTermAnnualDemand" [] <= $ "UtilityData.RestrictionTriggersStorageConservative" [1.00000000, 0.00000000] AND $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [] >= 0.90000000) THEN
+            FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date] := 1.00000000;
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date1 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date1] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "TriggerIWSA1-useToTestIWSAFunctionality";
+    DESCRIPTION          "";
+    ACTIVE               FALSE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 March 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+    DESCRIPTION          "at the end of every february, if utility storage is below the threshold that triggers level 3 <br>restrictions and the upcoming hydrology is at least 90% of longterm average, exercise the IWSA. <br>the next most senior rule will make sure it doesn't get triggered more than 3 times per 10 years";
+      IF_STATEMENT ($ "UtilityData.StorageToLongTermAnnualDemand" [] <= $ "UtilityData.RestrictionTriggersStorage" [5.00000000, 0.00000000] AND $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [] >= 0.10000000) THEN
+            FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date] := 1.00000000;
+
+      ENDFOREACH;
+
+      ELSE
+            FOREACH (DATETIME date1 IN @"t" TO @"t + 11") DO
+            $ "UtilityData.Ag2IWSAExercise" [date1] := 0.00000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetUtiltiyFractionalReturnFlowPhysical";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Utility:Reach.Fractional Return Flow" [] := ( $ "UtilityData.OutdoorReturnFlowPercent" [] * $ "UtilityData.RestrictedPercentOutdoorUse" [] ) + ( ( 1.00000000 - $ "UtilityData.RestrictedPercentOutdoorUse" [] ) * $ "UtilityData.IndoorReturnFlowPercent" [] );
+
+      $ "Utility:Wholesaler.Fractional Return Flow" [] := ( $ "UtilityData.OutdoorReturnFlowPercent" [] * $ "UtilityData.RestrictedPercentOutdoorUse" [] ) + ( ( 1.00000000 - $ "UtilityData.RestrictedPercentOutdoorUse" [] ) * $ "UtilityData.IndoorReturnFlowPercent" [] );
+
+    END;
+
+    RULE                 "SetPercentOutdoorUseAfterRestrictionsApplied";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.RestrictedPercentOutdoorUse" [] := $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] / $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [];
+
+    END;
+
+    RULE                 "SetMonthlyConservedAdjustedRestrictedTotalDemandAfterEfficiency";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [] := ( $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] + $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] ) / $ "UtilityData.DistributionEfficiency" [];
+
+      $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemandOGEfficiency" [] := ( $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] + $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] ) / 0.90000000;
+
+    END;
+
+    RULE                 "AlterUtilityDemandBasedOnRestrictions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityData.WeightedRestrictions" [] == 1.00000000) THEN
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedOutdoorDemand" [] * 0.80000000;
+
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedIndoorDemand" [] * 1.00000000;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT ($ "UtilityData.WeightedRestrictions" [] == 2.00000000) THEN
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedOutdoorDemand" [] * 0.50000000;
+
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedIndoorDemand" [] * 1.00000000;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT ($ "UtilityData.WeightedRestrictions" [] == 3.00000000) THEN
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedOutdoorDemand" [] * 0.00000000;
+
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedIndoorDemand" [] * 1.00000000;
+
+      END_IF_STATEMENT;
+
+      IF_STATEMENT ($ "UtilityData.WeightedRestrictions" [] == 0.00000000) THEN
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedOutdoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedOutdoorDemand" [];
+
+            $ "UtilityData.MonthlyConservedAdjustedRestrictedIndoorDemand" [] := $ "UtilityData.MonthlyConservedAdjustedIndoorDemand" [];
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetUtilityWeightedRestrictions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.WeightedRestrictions" [] := "Floor"( ( $ "UtilityData.HydroRestrictionsWeight" [] * $ "UtilityData.HydroRestrictions" [] ) + ( $ "UtilityData.StorageRestrictionsWeight" [] * $ "UtilityData.StorageRestrictions" [] ) + 0.50000000, 1.00000000 ) COMMENTED_BY "add 0.5 to value and take the floor to get same functionality as rounding (only have ceiling and <br>floor in RW)";
+
+    END;
+
+    RULE                 "SetUtilityHydrologyBasedRestrictions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"24:00:00 March 31, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            IF_STATEMENT ($ "UtilityData.HydrologyTriggerLevel" [] == 1.00000000) THEN
+            $ "UtilityData.HydroRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersHydrologyLax", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "UtilityData.HydrologyTriggerLevel" [] == 2.00000000) THEN
+            $ "UtilityData.HydroRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersHydrologyNeutral", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "UtilityData.HydrologyTriggerLevel" [] == 3.00000000) THEN
+            $ "UtilityData.HydroRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersHydrologyConservative", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetUtilityStorageBasedRestrictions";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"24:00:00 March 31, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 1.00000000) THEN
+            $ "UtilityData.StorageRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersStorageLax", 0.00000000, 1.00000000, $ "UtilityData.StorageToLongTermAnnualDemand" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 2.00000000) THEN
+            $ "UtilityData.StorageRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersStorageNeutral", 0.00000000, 1.00000000, $ "UtilityData.StorageToLongTermAnnualDemand" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "UtilityData.StorageTriggerLevel" [] == 3.00000000) THEN
+            $ "UtilityData.StorageRestrictions" [date] := "TableLookup"( $ "UtilityData.RestrictionTriggersStorageConservative", 0.00000000, 1.00000000, $ "UtilityData.StorageToLongTermAnnualDemand" [@"24:00:00 March 31, Current Year"], @"t", TRUE );
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "CalculateCurrentStorageToLongTermAnnualDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "UtilityData.StorageToLongTermAnnualDemand" [] := $ "UtilityData.CurrentUtilityStorage" [] / $ "UtilityData.LongTermAnnualDemand" [];
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "InitializeWestSlope";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWestSlopeResInitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "WestSlopeRes^UtilityTMD_1956.Initial Request" COMMENTED_BY "The maximum Utility can take is 80 cfs. If WestSlopeRes has no storage capacity, the diversion <br>rate should be limited to how much water can fit in Res2 (so max accrual - previous storage will <br>equal 0 and this term reduces to the amount of water that can fit in Res2). If West SlopeRes <br>does have storage capacity, that will be reflected by the Max Accrual slot and allow the sum of <br>accrual space and Res2 space to increase the opportunity to divert up to 80 cfs even if Res2 <br>can't hold it all. " [] := "Max"( "Min"( "VolumeToFlow"( ( "GetResMaxVolume"( % "Res2" ) - $ "Res2.Storage" [@"t - 1"] ) * 1.00000000, @"t" ) + "VolumeToFlow"( $ "WestSlopeRes^UtilityTMD_1956.Maximum Accrual" [] - $ "WestSlopeRes^UtilityTMD_1956.Storage" [@"t - 1"], @"t" ), 80.00000000 "cfs" ), 0.00000000 "cfs" );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "InitializeAll";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetFlowRightInitialOrMaxRequestAsDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+    DESCRIPTION          "For accounts with direct flow rights, set initial requests equal to the water right for all timesteps. <br>The accounts that this applies to all have water type &quot;FlowRight&quot;.";
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            FOREACH (OBJECT obj IN "ObjectsFromWaterType"( "FlowRight", "ALL" )) DO
+            IF_STATEMENT (obj != % "Utility:Reach" AND obj != % "Ag4:Reach") THEN
+            "GetInitialRequestSlot"( obj, "FlowRight" ) [date] := "GetDataObject"( obj ) & "Demand" [date];
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT (obj == % "Utility:Reach") THEN
+            $ "Utility:Reach^Utility_1895.Maximum Request" [date] := $ "UtilityData.Utility_1895_WaterRight" [date];
+
+            $ "Utility:Reach^Utility_1908.Maximum Request" [date] := $ "UtilityData.Utility_1908_WaterRight" [date];
+
+            $ "Utility:Reach^Utility_1936.Maximum Request" [date] := $ "UtilityData.Utility_1936_WaterRight" [date];
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT (obj == % "Ag4:Reach") THEN
+            $ "Ag4:Reach^Ag4_1920.Initial Request" [date] := $ "Ag4Data.Demand" [date];
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetOnstreamResInitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+    DESCRIPTION          "For all &quot;storage right&quot; accounts on onstream reservoirs, set initial request equal to the minimum <br>of: the volume that would fill the conservation pool or the volume left in their annual storage right <br>(compare the latter to 0 to make sure the initial request is not negative)<br><br><br>";
+      FOREACH (OBJECT res IN "ListSubbasin"( "OnstreamRes" )) DO
+            res ~ ( ( GET @INDEX 0.00000000 FROM "AccountNamesByWaterType"( res, "StorageRight" ) ) CONCAT ".Initial Request" ) [] := "Min"( res & "Conservation Pool Initial Empty Space" [], "Max"( "VolumeToFlow"( res ~ ( ( GET @INDEX 0.00000000 FROM "AccountNamesByWaterType"( res, "StorageRight" ) ) CONCAT ".Maximum Accrual" ) [] - res ~ ( ( GET @INDEX 0.00000000 FROM "AccountNamesByWaterType"( res, "StorageRight" ) ) CONCAT ".Accrual" ) [@"t - 1"], @"t" ), 0.00000000 "cfs" ) );
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetWholesalerQuota";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWholesalerAnnualQuota";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN "GetDates"( @"t", @"t + 11", "1 months" )) DO
+            $ "WholesalerData.WholesalerAnnualQuota" [date] := FOR ( NUMERIC val IN { "TableInterpolation"( $ "WholesalerData.PercentFullNonWholesalerResLookup", 0.00000000, 1.00000000, $ "WholesalerData.PercentFullNonWholesaler" [], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentFullWholesalerResLookup", 0.00000000, 1.00000000, $ "WholesalerData.PercentFullWholesaler" [], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentOfHistoricAverageEastInflowsLookup", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [@"24:00:00 December 31, Current Year"], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentOfHistoricAverageWestInflowsLookup", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermWestSlopeInflowWaterYearSums" [@"24:00:00 December 31, Current Year"], @"t" ) } ) STAT_AVE
+  val
+ ENDFOR;
+
+      ENDFOREACH;
+
+    INACTIVE      IF_STATEMENT (@"t" == @"0:00:00 April 1, Finish Year") THEN
+            FOREACH (DATETIME date IN "GetDates"( @"t", @"t + 6", "1 months" )) DO
+            $ "WholesalerData.WholesalerAnnualQuota" [date] := FOR ( NUMERIC val IN { "TableInterpolation"( $ "WholesalerData.PercentFullNonWholesalerResLookup", 0.00000000, 1.00000000, $ "WholesalerData.PercentFullNonWholesaler" [], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentFullWholesalerResLookup", 0.00000000, 1.00000000, $ "WholesalerData.PercentFullWholesaler" [], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentOfHistoricAverageEastInflowsLookup", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermEastSlopeInflowWaterYearSums" [@"24:00:00 December 31, Current Year"], @"t" ) , "TableInterpolation"( $ "WholesalerData.PercentOfHistoricAverageWestInflowsLookup", 0.00000000, 1.00000000, $ "WholesalerData.TotalPercentOfHistoricLongtermWestSlopeInflowWaterYearSums" [@"24:00:00 December 31, Current Year"], @"t" ) } ) STAT_AVE
+  val
+ ENDFOR;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+    END;
+
+    RULE                 "SetBasinPercentFullSlots";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"0:00:00 April 1, Current Year";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "WholesalerData.PercentFullNonWholesaler" [date] := ( "SumStorages"( "ListSubbasin"( "NonWholesalerRes" ) ) + $ "UtilityTMDData.WestSlopeResCapacity" [] * 1.00000000 "acre-ft" ) / $ "WholesalerData.TotalNonWholesalerStorage" [];
+
+      ENDFOREACH;
+
+      FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "WholesalerData.PercentFullWholesaler" [date] := "SumStorages"( "ListSubbasin"( "WholesalerRes" ) ) / $ "WholesalerData.TotalWholesalerStorage" [];
+
+      ENDFOREACH;
+
+      FOREACH (DATETIME date IN @"t" TO @"t + 11") DO
+            $ "Ag2ResData.Ag2ResPercentFull" [date] := $ "Ag2Res.Storage" [] / $ "Ag2Res.Elevation Volume Table" ["NumRows"( $ "Ag2Res.Elevation Volume Table" ) - 1.00000000, 1.00000000];
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "SetUtilityWRSolverAccountingInitialRequets";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetUtility1936InitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Utility:Reach^Utility_1936.Initial Request" [] := "Min"( "Max"( ( "VolumeToFlow"( $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [], @"t" ) - ( $ "Utility:Reach^PurchasedIndustrialRights.Initial Request" [] + $ "Utility:Reach^Utility_1895.Initial Request" [] + $ "Utility:Reach^Utility_1908.Initial Request" [] ) ), 0.00000000 "cfs" ), $ "Utility:Reach^Utility_1936.Maximum Request" [] );
+
+    END;
+
+    RULE                 "SetUtility1908InitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Utility:Reach^Utility_1908.Initial Request" [] := "Min"( "Max"( ( "VolumeToFlow"( $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [], @"t" ) - ( $ "Utility:Reach^PurchasedIndustrialRights.Initial Request" [] + $ "Utility:Reach^Utility_1895.Initial Request" [] ) ), 0.00000000 "cfs" ), $ "Utility:Reach^Utility_1908.Maximum Request" [] );
+
+    END;
+
+    RULE                 "SetUtilityIndustrialInitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Utility:Reach^PurchasedIndustrialRights.Initial Request" [] := "Min"( "Max"( ( "VolumeToFlow"( $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [], @"t" ) - $ "Utility:Reach^Utility_1895.Initial Request" [] ), 0.00000000 "cfs" ), $ "Utility:Reach^PurchasedIndustrialRights.Maximum Request" [] );
+
+    END;
+
+    RULE                 "SetUtility1895InitialRequest";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      $ "Utility:Reach^Utility_1895.Initial Request" [] := "Min"( "VolumeToFlow"( $ "UtilityData.MonthlyConservedAdjustedRestrictedTotalDemand" [], @"t" ), $ "Utility:Reach^Utility_1895.Maximum Request" [] );
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "AdjustUtilityDemandForDryAvgWet";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetLongTermAnnualDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "UtilityData.LongTermAnnualDemand" [date] := $ "UtilityData.OriginalAvgGPCD" [] * $ "UtilityData.OriginalPopulation" [] * $ "UtilityData.BuildoutPopIncreaseFactor" [] * 365.00000000;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetConservedAdjustedIndoorOutdoorDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "UtilityData.MonthlyConservedAdjustedIndoorDemand" [date] := $ "UtilityData.MoistureAdjustedConservedAFperMonth" [date] * $ "UtilityData.MonthlyIndoorPercent" [date];
+
+            $ "UtilityData.MonthlyConservedAdjustedOutdoorDemand" [date] := $ "UtilityData.MoistureAdjustedConservedAFperMonth" [date] * $ "UtilityData.MonthlyOutdoorPercent" [date];
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "CalculateMonthlyConservedAdjustedDemandAF";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            IF_STATEMENT (date == "CompletePartialDate"( @"October 31", date )) THEN
+            FOREACH (DATETIME date1 IN date TO date + 11.00000000 "month") DO
+            $ "UtilityData.MoistureAdjustedConservedAFperMonth" [date1] := $ "UtilityData.MoistureAdjustedConservedAFperYear" ["NextDate"( date + 1.00000000 "year", @"December 31" )] * $ "UtilityData.MonthlyDemandProportions" [date1];
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "CalculateMoistureAdjustedConservedAFperYear";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            IF_STATEMENT (date == "CompletePartialDate"( @"December 31", date )) THEN
+            $ "UtilityData.MoistureAdjustedConservedAFperYear" ["NextDate"( date + 1.00000000 "year", @"December 31" )] := $ "UtilityData.MoistureAdjustedConservedGPCD" [date] * $ "UtilityData.OriginalPopulation" [] * $ "UtilityData.BuildoutPopIncreaseFactor" [] * 365.00000000 COMMENTED_BY "not that big of a deal to approximate 365 days in every year";
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "CalculateMonthlyUtilityMoistureAdjustedConservedGPCD";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+          DESCRIPTION          "this is for wet jul-aug flow";
+      IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEvalForUtility" [date] > $ "AllHydroData.EastSlopeHistAvgJulAugUpper" []) THEN
+            $ "UtilityData.MoistureAdjustedConservedGPCD" [date] := $ "UtilityData.ConservedAvgGPCD" [] * 0.90000000;
+
+      END_IF_STATEMENT;
+
+          DESCRIPTION          "this is for dry jul-aug flow";
+      IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEvalForUtility" [date] < $ "AllHydroData.EastSlopeHistAvgJulAugLower" []) THEN
+            $ "UtilityData.MoistureAdjustedConservedGPCD" [date] := $ "UtilityData.ConservedAvgGPCD" [] * 1.10000000;
+
+      END_IF_STATEMENT;
+
+          DESCRIPTION          "this is for avg jul-aug flow";
+      IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEvalForUtility" [date] >= $ "AllHydroData.EastSlopeHistAvgJulAugLower" [] AND $ "AllHydroData.EastSlopeJulAugEval" [date] <= $ "AllHydroData.EastSlopeHistAvgJulAugUpper" []) THEN
+            $ "UtilityData.MoistureAdjustedConservedGPCD" [date] := $ "UtilityData.ConservedAvgGPCD" [];
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "AdjustNonUtilityDemandForDryAvgWet";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "AdjustEastSlopeUserDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEval" [date] > $ "AllHydroData.EastSlopeHistAvgJulAugUpper" []) THEN
+          DESCRIPTION          "this is for wet jul-aug flow (non instream)";
+      FOREACH (OBJECT user IN "ListSubbasin"( "EastSlopeNonUtilityUsers" )) DO
+            IF_STATEMENT (user != % "Ag4:Reach") THEN
+            "GetDataObject"( user ) & "Demand" [date] := "GetDataObject"( user ) & "WaterRight" [date] * 0.90000000;
+
+      ELSE
+            $ "Ag4Data.Demand" [date] := $ "Ag4Data.WaterRight" [date] * 0.90000000;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+          DESCRIPTION          "wet jul-aug flow, instream";
+      FOREACH (OBJECT instream IN "ListSubbasin"( "EastSlopeInstream" )) DO
+            "GetDataObject"( instream ) & "Demand" [date] := "GetDataObject"( instream ) & "WaterRight" [date];
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEval" [date] < $ "AllHydroData.EastSlopeHistAvgJulAugLower" []) THEN
+          DESCRIPTION          "this is for dry jul-aug flow (non instream)";
+      FOREACH (OBJECT user1 IN "ListSubbasin"( "EastSlopeNonUtilityUsers" )) DO
+            IF_STATEMENT (user1 != % "Ag4:Reach") THEN
+            "GetDataObject"( user1 ) & "Demand" [date] := "GetDataObject"( user1 ) & "WaterRight" [date];
+
+      ELSE
+            $ "Ag4Data.Demand" [date] := $ "Ag4Data.WaterRight" [date];
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+          DESCRIPTION          "dry jul-aug flow, instream";
+      FOREACH (OBJECT instream1 IN "ListSubbasin"( "EastSlopeInstream" )) DO
+            "GetDataObject"( instream1 ) & "Demand" [date] := "GetDataObject"( instream1 ) & "WaterRight" [date] * 0.75000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "AllHydroData.EastSlopeJulAugEval" [date] >= $ "AllHydroData.EastSlopeHistAvgJulAugLower" [] AND $ "AllHydroData.EastSlopeJulAugEval" [date] <= $ "AllHydroData.EastSlopeHistAvgJulAugUpper" []) THEN
+          DESCRIPTION          "This is for average jul-aug flow (non instream)";
+      FOREACH (OBJECT user2 IN "ListSubbasin"( "EastSlopeNonUtilityUsers" )) DO
+            IF_STATEMENT (user2 != % "Ag4:Reach") THEN
+            "GetDataObject"( user2 ) & "Demand" [date] := "GetDataObject"( user2 ) & "WaterRight" [date] * 0.95000000;
+
+      ELSE
+            $ "Ag4Data.Demand" [date] := $ "Ag4Data.WaterRight" [date] * 0.95000000;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+          DESCRIPTION          "avg jul-aug flow, instream";
+      FOREACH (OBJECT instream2 IN "ListSubbasin"( "EastSlopeInstream" )) DO
+            "GetDataObject"( instream2 ) & "Demand" [date] := "GetDataObject"( instream2 ) & "WaterRight" [date];
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "AdjustWestSlopeUserDemand";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+          DESCRIPTION          "this is for wet jul-aug flow";
+      IF_STATEMENT ($ "AllHydroData.WestSlopeJulAugEval" [date] > $ "AllHydroData.WestSlopeHistAvgJulAugUpper" []) THEN
+            FOREACH (OBJECT user IN "ListSubbasin"( "WestSlopeNonUtilityUsers" )) DO
+            "GetDataObject"( user ) & "Demand" [date] := "GetDataObject"( user ) & "WaterRight" [date] * 0.90000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "AllHydroData.WestSlopeJulAugEval" [date] < $ "AllHydroData.WestSlopeHistAvgJulAugLower" []) THEN
+          DESCRIPTION          "this is for dry jul-aug flow";
+      FOREACH (OBJECT user1 IN "ListSubbasin"( "WestSlopeNonUtilityUsers" )) DO
+            "GetDataObject"( user1 ) & "Demand" [date] := "GetDataObject"( user1 ) & "WaterRight" [date];
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+            IF_STATEMENT ($ "AllHydroData.WestSlopeJulAugEval" [date] >= $ "AllHydroData.WestSlopeHistAvgJulAugLower" [] AND $ "AllHydroData.WestSlopeJulAugEval" [date] <= $ "AllHydroData.WestSlopeHistAvgJulAugUpper" []) THEN
+          DESCRIPTION          "this is for avg jul-aug flow";
+      FOREACH (OBJECT user2 IN "ListSubbasin"( "WestSlopeNonUtilityUsers" )) DO
+            "GetDataObject"( user2 ) & "Demand" [date] := "GetDataObject"( user2 ) & "WaterRight" [date] * 0.95000000;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "DecisionLevers";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetWestSlopeResCapacity";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" AND NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+    DESCRIPTION          "If Utiity chooses to build the West Slope Res, the largest it can be is 10,000 AF. The elevation <br>volume table is already set up to accomodate 10,000 AF, but setting the max accrual equal to the <br>&quot;WestSlopeResCapacity&quot; slot (which will be an integer between 0 and 10) * 1000 AF will allow the <br>res to store up to its capacity as determined by algorithm decision variable.";
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "WestSlopeRes^UtilityTMD_1956.Maximum Accrual" [date] := $ "UtilityTMDData.WestSlopeResCapacity" [] * 1.00000000 "acre-ft";
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "AdjustAg3WaterRight";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" AND NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "Ag3Data.WaterRight" [date] := ( 1.00000000 - $ "UtilityData.PercentageOfAg3Rights" [] ) * $ "Ag3Data.OriginalWaterRight" [date];
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetPurchasedIndustrialRightsAmountAndAdjustIndustrialWaterRight";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep" AND NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "Utility:Reach^PurchasedIndustrialRights.Maximum Request" [date] := $ "UtilityData.PercentageOfIndustrialRights" [] * $ "IndustrialData.OriginalWaterRight" [date];
+
+            $ "IndustrialData.WaterRight" [date] := ( 1.00000000 - $ "UtilityData.PercentageOfIndustrialRights" [] ) * $ "IndustrialData.OriginalWaterRight" [date];
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetWholesalerRes2StorageAllotments";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "WholesalerRes2Data.UtilityStorageAllotment" [date] := $ "UtilityData.TotalWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] * ( "GetResMaxVolume"( % "WholesalerRes2" ) - 10000.00000000 "acre-ft" COMMENTED_BY "leave room for Utility's 20% carryover" );
+
+            $ "WholesalerRes2Data.ExternalUsersStorageAllotment" [date] := $ "ExternalWholesalerUsersData.OwnedWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] * ( "GetResMaxVolume"( % "WholesalerRes2" ) - 10000.00000000 "acre-ft" COMMENTED_BY "leave room for Utility's 20% carryover" );
+
+            $ "WholesalerRes2Data.Ag4StorageAllotment" [date] := $ "Ag4Data.OwnedWSShares" [] / $ "WholesalerRes2Data.TotalWSShares" [] * ( "GetResMaxVolume"( % "WholesalerRes2" ) - 10000.00000000 "acre-ft" COMMENTED_BY "leave room for Utility's 20% carryover" );
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "SetUtilityWholesalerShares";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "ThisRule" );
+    NOTES                "";
+    BEGIN
+
+      FOREACH (DATETIME date IN @"Start Timestep" TO @"Finish Timestep") DO
+            $ "UtilityData.TotalWSShares" [] := $ "UtilityData.InitialWSShares" [] + $ "UtilityData.SupplementalWSShares" [];
+
+            $ "ExternalWholesalerUsersData.OwnedWSShares" COMMENTED_BY "the shares that utility buys come from these external users; shares that the utility buys are <br>different from shares that they lease" [] := $ "ExternalWholesalerUsersData.OriginalOwnedShares" [] - $ "UtilityData.SupplementalWSShares" [];
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "ReservoirGainLossEvap";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "AllResGainLossStorageExceptRes2";
+    DESCRIPTION          "";
+    ACTIVE               FALSE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT res IN "ListSubbasin"( "AllRes" )) DO
+            IF_STATEMENT (res != % "Res2") THEN
+            FOREACH (STRING account IN "AccountNamesByAccountType"( res, "Storage" )) DO
+            res ~ ( account CONCAT ".Gain Loss" ) [] := IF ( IsNaN res & "Evaporation" [] )
+ THEN
+  0.00000000 "acre-ft"
+ ELSE
+  WITH NUMERIC totalAccountStorage = FOR ( STRING account1 IN "AccountNamesByAccountType"( res, "Storage" ) ) STAT_SUM
+   IF ( res ~ ( account1 CONCAT ".Storage" ) [] <= 0.01000000 "acre-ft" )
+   THEN
+    0.00000000 "acre-ft"
+   ELSE
+    res ~ ( account1 CONCAT ".Storage" ) []
+   ENDIF
+  ENDFOR DO
+   "Min"( - ( res & "Evaporation" [] * IF ( totalAccountStorage == 0.00000000 "acre-ft" )
+   THEN
+    0.00000000
+   ELSE
+    ( IF ( res ~ ( account CONCAT ".Storage" ) [] <= 0.01000000 "acre-ft" )
+    THEN
+     0.00000000 "acre-ft"
+    ELSE
+     res ~ ( account CONCAT ".Storage" ) []
+    ENDIF / totalAccountStorage )
+   ENDIF ), 0.00000000 "acre-ft" )
+  ENDWITH
+ ENDIF;
+
+      ENDFOREACH;
+
+      END_IF_STATEMENT;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "AllResGainLossStorageRes2";
+    DESCRIPTION          "";
+    ACTIVE               FALSE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT res IN { % "Res2" }) DO
+            FOREACH (STRING account IN { "Res2_1955" , "UtilityTMD_1956" }) DO
+            res ~ ( account CONCAT ".Gain Loss" ) [] := IF ( IsNaN res & "Storage" [] )
+ THEN
+  0.00000000 "acre-ft"
+ ELSE
+  WITH NUMERIC totalAccountStorage = FOR ( STRING account1 IN { "Res2_1955" , "UtilityTMD_1956" } ) STAT_SUM
+   IF ( res ~ ( account1 CONCAT ".Storage" ) [] - "FlowToVolume"( NaNToZero ( res ~ ( account1 CONCAT ".Diversion" ) [] ), @"t" ) <= 0.01000000 "acre-ft" )
+   THEN
+    0.00000000 "acre-ft"
+   ELSE
+    res ~ ( account1 CONCAT ".Storage" ) [] - "FlowToVolume"( NaNToZero ( res ~ ( account1 CONCAT ".Diversion" ) [] ), @"t" )
+   ENDIF
+  ENDFOR DO
+   "Min"( - ( res & "Evaporation" [] * IF ( totalAccountStorage == 0.00000000 "acre-ft" )
+   THEN
+    0.00000000
+   ELSE
+    ( IF ( res ~ ( account CONCAT ".Storage" ) [] <= 0.01000000 "acre-ft" )
+    THEN
+     0.00000000 "acre-ft"
+    ELSE
+     res ~ ( account CONCAT ".Storage" ) []
+    ENDIF / totalAccountStorage )
+   ENDIF ), 0.00000000 "acre-ft" )
+  ENDWITH
+ ENDIF;
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "AllResGainLossStorage";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT res IN "ListSubbasin"( "AllRes" )) DO
+            FOREACH (STRING account IN "AccountNamesByAccountType"( res, "Storage" )) DO
+            res ~ ( account CONCAT ".Gain Loss" ) [] := IF ( IsNaN res & "Evaporation" [] )
+ THEN
+  0.00000000 "acre-ft"
+ ELSE
+  WITH NUMERIC totalAccountStorage = FOR ( STRING account1 IN "AccountNamesByAccountType"( res, "Storage" ) ) STAT_SUM
+   IF ( res ~ ( account1 CONCAT ".Storage" ) [] <= 0.01000000 "acre-ft" )
+   THEN
+    0.00000000 "acre-ft"
+   ELSE
+    res ~ ( account1 CONCAT ".Storage" ) []
+   ENDIF
+  ENDFOR DO
+   "Min"( - ( res & "Evaporation" [] * IF ( totalAccountStorage == 0.00000000 "acre-ft" )
+   THEN
+    0.00000000
+   ELSE
+    ( IF ( res ~ ( account CONCAT ".Storage" ) [] <= 0.01000000 "acre-ft" )
+    THEN
+     0.00000000 "acre-ft"
+    ELSE
+     res ~ ( account CONCAT ".Storage" ) []
+    ENDIF / totalAccountStorage )
+   ENDIF ), 0.00000000 "acre-ft" )
+  ENDWITH
+ ENDIF;
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+    RULE                 "AllResGainLossPassthrough";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT TRUE;
+    NOTES                "";
+    BEGIN
+
+      FOREACH (OBJECT res IN "ListSubbasin"( "AllRes" )) DO
+            FOREACH (STRING account2 IN "AccountNamesByAccountType"( res, "PassThrough" )) DO
+            res ~ ( account2 CONCAT ".Gain Loss" ) [] := 0.00000000 "acre-ft";
+
+      ENDFOREACH;
+
+      ENDFOREACH;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "WestSlopeResStorage";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "AdjustWestSlopeResInitialStorage";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT @"t" == @"Start Timestep";
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityTMDData.WestSlopeResCapacity" [] > 0.00000000) THEN
+            $ "WestSlopeRes.Storage" [@"Start Timestep - 1"] := $ "UtilityTMDData.WestSlopeResCapacity" [] * 0.80000000 "acre-ft";
+
+            $ "WestSlopeRes^UtilityTMD_1956.Storage" [@"Start Timestep - 1"] := $ "UtilityTMDData.WestSlopeResCapacity" [] * 0.80000000 "acre-ft";
+
+      END_IF_STATEMENT;
+
+    END;
+
+  END;
+
+  POLICY_GROUP   "Ag2ResStorage";
+  DESCRIPTION    "";
+  ACTIVE         TRUE;
+  NOTES          "";
+  BEGIN
+
+    RULE                 "SetAg2ResInitialStorages";
+    DESCRIPTION          "";
+    ACTIVE               TRUE;
+    RULE_EXEC_CONSTRAINT NOT "HasRuleFiredSuccessfully"( "This Rule" );
+    NOTES                "";
+    BEGIN
+
+      IF_STATEMENT ($ "UtilityData.Ag2PurchasedShares" [] > 0.00000000) THEN
+            $ "Ag2Res.Storage" [@"Start Timestep - 1"] := 0.50000000 "acre-ft" * $ "UtilityData.Ag2PurchasedShares" [];
+
+            $ "Ag2Res^UtilityAg2Shares.Storage" [@"Start Timestep - 1"] := 0.50000000 "acre-ft" * $ "UtilityData.Ag2PurchasedShares" [];
+
+            $ "Ag2Res^Ag2Shares.Storage" [@"Start Timestep - 1"] := 0.00000000 "acre-ft";
+
+      ELSE
+            $ "Ag2Res.Storage" [@"Start Timestep - 1"] := 3000.00000000 "acre-ft";
+
+            $ "Ag2Res^Ag2Shares.Storage" [@"Start Timestep - 1"] := 3000.00000000 "acre-ft";
+
+            $ "Ag2Res^UtilityAg2Shares.Storage" [@"Start Timestep - 1"] := 0.00000000 "acre-ft";
+
+      END_IF_STATEMENT;
+
+    END;
+
+  END;
+
+  UTILITY_GROUP "Utility Group 1";
+  DESCRIPTION   "";
+  ACTIVE        TRUE;
+  NOTES          "";
+  BEGIN
+
+    FUNCTION       "GetDataObject" ( OBJECT obj )
+    RETURN_TYPE    OBJECT;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      "GetObject"( obj CONCAT "Data" );
+
+    END;
+
+    FUNCTION       "GetInitialRequestSlot" ( OBJECT obj, STRING WaterType )
+    RETURN_TYPE    SLOT;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      obj ~ ( ( GET @INDEX 0.00000000 FROM "AccountNamesByWaterType"( obj, WaterType ) ) CONCAT ".Initial Request" );
+
+    END;
+
+    FUNCTION       "GetShortageSlot" ( OBJECT obj, STRING WaterType )
+    RETURN_TYPE    SLOT;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      obj ~ ( ( GET @INDEX 0.00000000 FROM "AccountNamesByWaterType"( obj, WaterType ) ) CONCAT ".Shortage" );
+
+    END;
+
+    FUNCTION       "SumAcctSlot" ( OBJECT obj, STRING slot, DATETIME date )
+    RETURN_TYPE    NUMERIC;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      FOR ( STRING acct IN "AccountNamesByAccountType"( obj, "ALL" ) ) STAT_SUM
+  NaNToZero ( obj ~ ( acct CONCAT ( "." CONCAT slot ) ) [date] )
+ ENDFOR;
+
+    END;
+
+    FUNCTION       "AccrualToReachTopOfConservationPool" ( OBJECT res )
+    RETURN_TYPE    NUMERIC;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      "ElevationToStorage"( res, res & "Operating Level Table" [@"t", res & "Top of Conservation Pool" []] ) - res & "Storage" [@"t - 1"];
+
+    END;
+
+    FUNCTION       "GetResMaxVolume" ( OBJECT res )
+    RETURN_TYPE    NUMERIC;
+    SCALE_UNITS    "";
+    DESCRIPTION    "";
+    ACTIVE         TRUE;
+    PRE_EXEC_DIAG  FALSE;
+    POST_EXEC_DIAG FALSE;
+    NOTES          "";
+    BEGIN
+
+      res CONCAT ".Elevation Volume Table" ["NumRows"( res & "Elevation Volume Table" ) - 1.00000000, 1.00000000];
+
+    END;
+
+  END;
+
+END

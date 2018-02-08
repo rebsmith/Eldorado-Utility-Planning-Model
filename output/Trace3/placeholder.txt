@@ -1,0 +1,2 @@
+#this is an empty file created to be able to upload an empty directory to GitHub
+#it can be deleted (or not) once file structure is properly situated on your machine

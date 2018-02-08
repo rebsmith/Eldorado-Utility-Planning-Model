@@ -1,0 +1,4 @@
+units: NONE
+scale: 1.000000
+# Scalar Slot: Objectives.PercentageOfMonthsInAnyRestriction [1 NONE]
+0.44 
